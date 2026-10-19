@@ -1,5 +1,7 @@
 <h1 align="center">LingBot-VLA 2.0: From Foundation to Application</h1>
 
+> 2026 比赛准备入口：[competition/README.md](competition/README.md)。保留官方历史与许可证；本机准备代码和下载清单，训练环境与大文件在目标 Ubuntu 电脑配置。
+
 <p align="center">
   <a href="https://arxiv.org/pdf/2607.06403"><img src="https://img.shields.io/static/v1?label=Paper&message=PDF&color=red&logo=arxiv"></a>
   <a href="https://technology.robbyant.com/lingbot-vla-v2"><img src="https://img.shields.io/badge/Project-Website-blue"></a>
