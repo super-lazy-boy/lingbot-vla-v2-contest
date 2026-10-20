@@ -12,6 +12,10 @@ data:
   datasets_type: vla
   data_name: multi
   train_path: assets/training_data/robotwin_clean.txt
+  # Contest rule: normalization must be computed from clean data only.
+  # Keep this pinned — without it, training silently falls back to the robot
+  # config's official stats, which include randomized data.
+  norm_stats_file: assets/norm_stats/robotwin_clean.json
   robot_config_root: ./configs/robot_configs
   joints:
     - arm.position: 14
