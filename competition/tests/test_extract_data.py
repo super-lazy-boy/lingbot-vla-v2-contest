@@ -64,10 +64,39 @@ class ExtractDataTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "traversal|outside|unsafe"):
             extract.extract_archive(self.zip_path, self.dest())
 
-    def test_rejects_symlink_entry(self):
+    def test_rejects_escaping_symlink_entry(self):
         self.write_zip([("link.txt", b"../../etc/passwd", True)])
-        with self.assertRaisesRegex(ValueError, "symlink"):
+        with self.assertRaisesRegex(ValueError, "symlink target escapes"):
             extract.extract_archive(self.zip_path, self.dest())
+
+    def test_rejects_absolute_target_symlink_entry(self):
+        self.write_zip([("link.txt", b"/etc/passwd", True)])
+        with self.assertRaisesRegex(ValueError, "symlink target escapes"):
+            extract.extract_archive(self.zip_path, self.dest())
+
+    def test_allows_symlink_pointing_inside_tree(self):
+        self.write_zip([
+            ("dataset/adjust_bottle/real.json", b"{}", False),
+            ("dataset/adjust_bottle/scene_info.json", b"real.json", True),
+        ])
+        extract.extract_archive(self.zip_path, self.dest())
+        link = self.dest() / "dataset/adjust_bottle/scene_info.json"
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(link.read_bytes(), b"{}")
+
+    def test_regular_file_with_high_mode_bits_not_mistaken_for_symlink(self):
+        # Real dataset zips store st_mode (S_IFREG|0o644) << 16; bit 31 is set
+        # there and must not trigger the Windows reparse-point check.
+        payload = b'{"episode_0": {}}'
+        with zipfile.ZipFile(self.zip_path, "w") as zf:
+            info = zipfile.ZipInfo("dataset/adjust_bottle/scene_info.json")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | 0o644) << 16
+            zf.writestr(info, payload)
+        extract.extract_archive(self.zip_path, self.dest())
+        out = self.dest() / "dataset/adjust_bottle/scene_info.json"
+        self.assertTrue(out.is_file())
+        self.assertEqual(out.read_bytes(), payload)
 
     def test_extracts_regular_archive(self):
         self.write_zip([

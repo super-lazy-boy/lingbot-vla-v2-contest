@@ -8,6 +8,7 @@ writing anything. Pure stdlib; run it with any Python 3.10+ interpreter.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 import zipfile
@@ -34,24 +35,39 @@ def validate_entry_name(name: str) -> str:
 
 
 def is_symlink(info: zipfile.ZipInfo) -> bool:
-    """Detect symlinks stored with Unix mode or the Windows reparse-point flag."""
-    unix_mode = (info.external_attr >> 16) & 0o170000
-    return unix_mode == 0o120000 or bool(info.external_attr & 0xA0000000)
+    """Detect symlinks stored as Unix mode or the DOS reparse-point attribute.
+
+    The Windows attribute check applies only to non-Unix entries: Unix
+    entries put the full ``st_mode`` in the high 16 bits, so bits like
+    0x80000000 are ordinary permission bits and must not be read as the
+    reparse-point marker.
+    """
+    if info.create_system == 3:  # Unix
+        return (info.external_attr >> 16) & 0o170000 == 0o120000
+    return (info.external_attr >> 16) & 0x400 != 0  # DOS FILE_ATTRIBUTE_REPARSE_POINT
 
 
 def extract_archive(zip_path: Path, destination: Path) -> int:
-    """Extract one archive into destination. Returns the number of files written."""
+    """Extract one archive into destination. Returns the number of files written.
+
+    Symlinks are allowed only when their target resolves inside the
+    destination tree (the official archives use in-tree symlinks such as
+    ``scene_info.json``); absolute targets and targets that escape the tree
+    are rejected.
+    """
     if not zip_path.is_file():
         raise ValueError(f"Missing archive: {zip_path}")
     destination.mkdir(parents=True, exist_ok=True)
     dest_resolved = destination.resolve()
+    symlinks = []
     count = 0
     with zipfile.ZipFile(zip_path) as archive:
         for info in archive.infolist():
-            if is_symlink(info):
-                raise ValueError(f"symlink entry rejected: {info.filename!r}")
             name = validate_entry_name(info.filename)
             if not name:
+                continue
+            if is_symlink(info):
+                symlinks.append((name, info))
                 continue
             target = (destination / name).resolve()
             if not target.is_relative_to(dest_resolved):
@@ -63,6 +79,19 @@ def extract_archive(zip_path: Path, destination: Path) -> int:
             with archive.open(info) as source, open(target, "wb") as sink:
                 while chunk := source.read(4 * 1024 * 1024):
                     sink.write(chunk)
+            count += 1
+        for name, info in symlinks:
+            link_path = destination / name
+            target_text = archive.read(info).decode("utf-8")
+            if os.path.isabs(target_text):
+                raise ValueError(f"symlink target escapes destination: {info.filename!r}")
+            resolved = (link_path.parent / target_text).resolve()
+            if not resolved.is_relative_to(dest_resolved):
+                raise ValueError(f"symlink target escapes destination: {info.filename!r}")
+            link_path.parent.mkdir(parents=True, exist_ok=True)
+            if link_path.is_symlink() or link_path.exists():
+                link_path.unlink()
+            os.symlink(target_text, link_path)
             count += 1
     return count
 
