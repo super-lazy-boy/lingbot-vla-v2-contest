@@ -56,7 +56,7 @@ class ConvertDatasetTests(unittest.TestCase):
                 colors[cam] = frames
             if instructions is None:
                 instructions = ["Pick the bottle with ridges", "Lift the mug"]
-            f.create_dataset("additional_info/instructions", data=json.dumps(instructions).encode("utf-8"))
+            f.create_dataset("instructions", data=json.dumps(instructions).encode("utf-8"))
         return path, colors
 
     def test_decode_marked_jpeg_returns_rgb(self):

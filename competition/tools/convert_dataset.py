@@ -72,8 +72,8 @@ def concat_14dim(root: h5py.Group, prefix: str) -> np.ndarray:
 
 
 def read_instructions(root: h5py.Group) -> list[str]:
-    """Parse the episode instruction list stored as JSON bytes."""
-    raw = root["additional_info/instructions"][()]
+    """Parse the episode instruction list stored at the HDF5 root as JSON bytes."""
+    raw = root["instructions"][()]
     if isinstance(raw, (bytes, np.bytes_)):
         raw = bytes(raw).decode("utf-8")
     instructions = json.loads(raw)
@@ -136,7 +136,12 @@ def find_episodes(raw_root: Path, task: str) -> list[Path]:
 
 def build_dataset(episodes: list[Path], repo_id: str) -> None:
     """Write all episodes into a fresh LeRobot v2.1 dataset (videos)."""
-    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+    import shutil
+
+    from lerobot.datasets.lerobot_dataset import HF_LEROBOT_HOME, LeRobotDataset
+
+    if (HF_LEROBOT_HOME / repo_id).exists():
+        shutil.rmtree(HF_LEROBOT_HOME / repo_id)
 
     dataset = LeRobotDataset.create(
         repo_id=repo_id,
