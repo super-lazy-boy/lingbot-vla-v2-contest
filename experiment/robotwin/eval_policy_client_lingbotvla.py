@@ -167,7 +167,9 @@ def main(usr_args):
 
     st_seed = 100000 * (1 + seed)
     suc_nums = []
-    test_num = 100
+    # 允许 EVAL_TEST_NUM 环境变量覆盖每任务 episode 数（默认 100）。
+    # 比赛评测时间受限时裁剪规模用；results.json 按实际测试次数填写。
+    test_num = int(os.environ.get("EVAL_TEST_NUM", "100"))
     topk = 1
 
     # model = get_model(usr_args)
